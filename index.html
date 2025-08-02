@@ -9,191 +9,44 @@
         #aura-canvas { display: block; cursor: pointer; position: absolute; top: 0; left: 0; background: linear-gradient(135deg, #020024, #090979, #00d4ff); background-size: 200% 200%; animation: gradientShift 180s ease infinite; }
         #intro-message { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: rgba(255, 255, 255, 0.7); font-size: 1.2rem; text-align: center; letter-spacing: 0.1rem; pointer-events: none; opacity: 1; transition: opacity 0.5s ease; }
         @keyframes gradientShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+        /* --- Astral Codex UI --- */
+        #codex-button { position: absolute; top: 20px; right: 20px; font-size: 2rem; cursor: pointer; user-select: none; z-index: 100; transition: transform 0.2s ease; filter: drop-shadow(0 0 5px rgba(255,255,255,0.5)); }
+        #codex-button:hover { transform: scale(1.1); }
+
+        #codex-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(2, 0, 36, 0.8); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 99; display: flex; justify-content: center; align-items: center; opacity: 1; transition: opacity 0.3s ease; }
+        #codex-overlay.hidden { opacity: 0; pointer-events: none; }
+
+        #codex-content { color: white; background: rgba(255, 255, 255, 0.1); padding: 2rem 4rem; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.2); text-align: center; font-family: 'Segoe UI', sans-serif; }
+        #codex-content h2 { margin-top: 0; letter-spacing: 0.2rem; text-transform: uppercase; font-weight: 300; }
+        #codex-list { list-style: none; padding: 0; margin: 2rem 0; min-width: 250px; }
+        #codex-list li { font-size: 1.2rem; padding: 0.5rem 0; opacity: 0.7; letter-spacing: 0.1rem; }
+        #codex-list li.empty { font-style: italic; }
+
+        #codex-close, #codex-share { cursor: pointer; margin-top: 1rem; padding: 0.5rem 1rem; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 5px; display: inline-block; transition: background 0.2s ease, color 0.2s ease; margin: 0 0.5rem; }
+        #codex-close:hover, #codex-share:hover { background: rgba(255, 255, 255, 0.2); }
     </style>
 </head>
 <body>
     <div id="intro-message">Touch to awaken the garden</div>
+
+    <!-- Astral Codex UI -->
+    <div id="codex-button">📜</div>
+    <div id="codex-overlay" class="hidden">
+        <div id="codex-content">
+            <h2>Astral Codex</h2>
+            <ul id="codex-list">
+                <!-- Discovered constellations will be listed here by ui.js -->
+            </ul>
+            <div>
+                <div id="codex-share" title="Copy a shareable link to your clipboard">Share Garden</div>
+                <div id="codex-close">Close</div>
+            </div>
+        </div>
+    </div>
+
     <canvas id="aura-canvas"></canvas>
 
-    <script>
-        // --- Encapsulated Application Logic ---
-        const App = {
-            // --- Elements & Context ---
-            canvas: document.getElementById('aura-canvas'),
-            ctx: null,
-            introMessage: document.getElementById('intro-message'),
-
-            // --- State Management ---
-            isInitialized: false,
-            isPaused: false,
-            animationFrameId: null,
-            ripples: [],
-            seeds: [],
-            blooms: [],
-
-            // --- Interaction & UX Tuning ---
-            lastTap: { time: 0, x: 0, y: 0 },
-            DOUBLE_TAP_DELAY: 300, // ms
-            DOUBLE_TAP_RADIUS: 50, // pixels
-
-            // --- Sound Engine ---
-            audioContext: null,
-            lastSoundTime: 0,
-            SOUND_COOLDOWN: 100, // ms
-            PENTATONIC_SCALE: [261.63, 329.63, 392.00, 440.00, 523.25],
-            BLOOM_CHORD: [261.63, 329.63, 392.00],
-
-            init() {
-                this.ctx = this.canvas.getContext('2d');
-                this.resizeCanvas();
-                
-                // Attach all event listeners
-                window.addEventListener('resize', () => this.resizeCanvas());
-                window.addEventListener('mousedown', (e) => this.handleInteraction(e));
-                window.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    this.handleInteraction(e);
-                });
-                // [FIX V-02] Add Page Visibility listener to pause/resume animation
-                document.addEventListener('visibilitychange', () => this.handleVisibilityChange());
-                
-                this.animate();
-            },
-
-            handleVisibilityChange() {
-                if (document.visibilityState === 'hidden') {
-                    this.isPaused = true;
-                    cancelAnimationFrame(this.animationFrameId);
-                } else {
-                    this.isPaused = false;
-                    this.animate();
-                }
-            },
-
-            resizeCanvas() {
-                this.canvas.width = window.innerWidth;
-                this.canvas.height = window.innerHeight;
-                // [FIX V-01] Reposition elements on resize to prevent state loss
-                this.repositionElements();
-            },
-
-            repositionElements() {
-                this.seeds.forEach(seed => {
-                    seed.x = Math.max(0, Math.min(this.canvas.width, seed.x));
-                    seed.y = Math.max(0, Math.min(this.canvas.height, seed.y));
-                });
-            },
-
-            playSound(freq, volume = 0.2, type = 'sine') {
-                const now = Date.now();
-                // [FIX V-04] Implement audio cooldown to prevent cacophony
-                if (!this.audioContext || now - this.lastSoundTime < this.SOUND_COOLDOWN) return;
-                this.lastSoundTime = now;
-
-                const oscillator = this.audioContext.createOscillator();
-                const gainNode = this.audioContext.createGain();
-                oscillator.type = type;
-                oscillator.frequency.setValueAtTime(freq, this.audioContext.currentTime);
-                gainNode.gain.setValueAtTime(volume, this.audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 1.2);
-                oscillator.connect(gainNode).connect(this.audioContext.destination);
-                oscillator.start();
-                oscillator.stop(this.audioContext.currentTime + 1.2);
-            },
-
-            playChord(chord, volume) {
-                chord.forEach(freq => this.playSound(freq, volume, 'triangle'));
-            },
-
-            handleInteraction(e) {
-                if (!this.isInitialized) {
-                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    this.introMessage.style.opacity = '0';
-                    for (let i = 0; i < 5; i++) { this.seeds.push(new LightSeed()); }
-                    this.isInitialized = true;
-                }
-
-                const currentTime = Date.now();
-                const timeSinceLastTap = currentTime - this.lastTap.time;
-                const x = e.clientX || (e.touches && e.touches[0].clientX);
-                const y = e.clientY || (e.touches && e.touches[0].clientY);
-                const dist = Math.hypot(x - this.lastTap.x, y - this.lastTap.y);
-
-                // [FIX V-04] Enhanced double-tap logic with spatial check
-                if (timeSinceLastTap < this.DOUBLE_TAP_DELAY && dist < this.DOUBLE_TAP_RADIUS) {
-                    this.ripples.push(new Ripple(x, y, true));
-                    this.playSound(this.PENTATONIC_SCALE[0] / 2, 0.3); // Deep pulse sound
-                    this.lastTap.time = 0; // Reset tap to prevent triple-taps
-                } else {
-                    this.ripples.push(new Ripple(x, y, false));
-                    this.playSound(this.PENTATONIC_SCALE[1], 0.2);
-                }
-                this.lastTap = { time: currentTime, x, y };
-            },
-
-            animate() {
-                if (this.isPaused) return;
-
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-                this.seeds.forEach(seed => {
-                    seed.update();
-                    seed.draw(this.ctx);
-                });
-
-                this.ripples.forEach(ripple => {
-                    ripple.update();
-                    ripple.draw(this.ctx);
-                    
-                    this.seeds.forEach((seed, sIndex) => {
-                        const dist = Math.hypot(ripple.x - seed.x, ripple.y - seed.y);
-                        if (Math.abs(dist - ripple.radius) < 10) {
-                            seed.nudge(ripple.x, ripple.y);
-                            this.playSound(this.PENTATONIC_SCALE[seed.energy], 0.4);
-                            
-                            if (seed.energy >= seed.maxEnergy) {
-                                this.blooms.push(new Bloom(seed.x, seed.y));
-                                this.playChord(this.BLOOM_CHORD, 0.3);
-                                this.seeds.splice(sIndex, 1);
-                                setTimeout(() => this.seeds.push(new LightSeed()), 2000);
-                            }
-                        }
-                    });
-                });
-                
-                this.blooms.forEach(bloom => {
-                    bloom.update();
-                    bloom.draw(this.ctx);
-                });
-
-                // [FIX V-03] Use safe, immutable filtering for cleanup
-                this.ripples = this.ripples.filter(r => r.opacity > 0);
-                this.blooms = this.blooms.filter(b => b.life > 0);
-
-                this.animationFrameId = requestAnimationFrame(() => this.animate());
-            }
-        };
-
-        // --- Class Definitions (unchanged logic, but pass ctx) ---
-        class Ripple {
-            constructor(x, y, isPulse = false) { this.x = x; this.y = y; this.isPulse = isPulse; this.radius = 0; this.maxRadius = isPulse ? 400 : 180; this.speed = isPulse ? 1.0 : 1.8; this.opacity = isPulse ? 0.6 : 1.0; this.lineWidth = isPulse ? 2 : 4; }
-            update() { this.radius += this.speed; if (this.opacity > 0) this.opacity -= 0.01; }
-            draw(ctx) { ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.strokeStyle = `rgba(255, 255, 255, ${this.opacity})`; ctx.lineWidth = this.lineWidth; if (this.isPulse) ctx.setLineDash([5, 15]); ctx.stroke(); ctx.setLineDash([]); ctx.closePath(); }
-        }
-        class LightSeed {
-            constructor() { this.x = Math.random() * App.canvas.width; this.y = Math.random() * App.canvas.height; this.vx = (Math.random() - 0.5) * 0.2; this.vy = (Math.random() - 0.5) * 0.2; this.radius = 5; this.energy = 0; this.maxEnergy = 3; }
-            nudge(sourceX, sourceY) { this.energy = Math.min(this.maxEnergy, this.energy + 1); const angle = Math.atan2(this.y - sourceY, this.x - sourceX); this.vx += Math.cos(angle) * 0.5; this.vy += Math.sin(angle) * 0.5; }
-            update() { this.x += this.vx; this.y += this.vy; this.vx *= 0.98; this.vy *= 0.98; if (this.x < 0 || this.x > App.canvas.width) this.vx *= -1; if (this.y < 0 || this.y > App.canvas.height) this.vy *= -1; }
-            draw(ctx) { ctx.beginPath(); const displayRadius = this.radius + this.energy * 2; const glow = ctx.createRadialGradient(this.x, this.y, 1, this.x, this.y, displayRadius * 2); glow.addColorStop(0, `rgba(255, 255, 255, ${0.5 + this.energy * 0.15})`); glow.addColorStop(1, "rgba(255, 255, 255, 0)"); ctx.fillStyle = glow; ctx.arc(this.x, this.y, displayRadius * 2, 0, Math.PI * 2); ctx.fill(); }
-        }
-        class Bloom {
-            constructor(x, y) { this.x = x; this.y = y; this.life = 1.0; this.angle = Math.random() * Math.PI * 2; }
-            update() { this.life -= 0.008; }
-            draw(ctx) { ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle + (1 - this.life) * 0.5); for (let i = 0; i < 6; i++) { const length = 50 + (1 - this.life) * 100; ctx.rotate(Math.PI / 3); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(length, 0); ctx.strokeStyle = `rgba(255, 220, 180, ${this.life * 0.8})`; ctx.lineWidth = 3 * this.life; ctx.stroke(); } ctx.restore(); }
-        }
-
-        // --- Launch Application ---
-        App.init();
-    </script>
+    <script type="module" src="js/app.js"></script>
 </body>
 </html>
