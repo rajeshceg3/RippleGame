@@ -39,12 +39,15 @@ export const UI = {
             const emptyItem = document.createElement('li');
             emptyItem.textContent = 'Your garden is yet to reveal its secrets...';
             emptyItem.className = 'empty';
+            emptyItem.style.animationDelay = '0.1s';
             this.codexList.appendChild(emptyItem);
         } else {
-            state.unlockedConstellations.forEach(constellationData => {
+            state.unlockedConstellations.forEach((constellationData, index) => {
                 const listItem = document.createElement('li');
                 const definition = ConstellationManager.definitions[constellationData.key];
                 listItem.textContent = definition ? definition.name : 'Unknown Star';
+                // Stagger animation
+                listItem.style.animationDelay = `${index * 0.15}s`;
                 this.codexList.appendChild(listItem);
             });
         }

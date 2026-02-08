@@ -12,6 +12,18 @@ export const App = {
     init() {
         this.ctx = this.canvas.getContext('2d');
         this.loadState(); // Load progress before anything else
+
+        // Initialize Background Stars
+        for (let i = 0; i < 150; i++) {
+            state.backgroundStars.push({
+                x: Math.random() * window.innerWidth,
+                y: Math.random() * window.innerHeight,
+                size: Math.random() * 1.5,
+                opacity: Math.random(),
+                speed: Math.random() * 0.01 + 0.002
+            });
+        }
+
         this.resizeCanvas();
         UI.init();
 
@@ -109,26 +121,62 @@ export const App = {
             seed.x = Math.max(0, Math.min(this.canvas.width, seed.x));
             seed.y = Math.max(0, Math.min(this.canvas.height, seed.y));
         });
+
+        // Redistribute stars on resize
+        state.backgroundStars.forEach(star => {
+            star.x = Math.random() * this.canvas.width;
+            star.y = Math.random() * this.canvas.height;
+        });
     },
 
     playSound(freq, volume = 0.2, type = 'sine') {
         const now = Date.now();
-        if (!state.audioContext || now - state.lastSoundTime < config.SOUND_COOLDOWN) return;
+        if (!state.audioContext) return;
+        // Relaxed cooldown check to allow more polyphony, but keeping it to prevent explosion
+        if (now - state.lastSoundTime < 20) return;
         state.lastSoundTime = now;
 
+        // Oscillator 1 (Fundamental)
         const oscillator = state.audioContext.createOscillator();
         const gainNode = state.audioContext.createGain();
-        oscillator.type = type;
+        oscillator.type = 'sine';
         oscillator.frequency.setValueAtTime(freq, state.audioContext.currentTime);
-        gainNode.gain.setValueAtTime(volume, state.audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, state.audioContext.currentTime + 1.2);
+
+        const attack = 0.02;
+        const decay = 2.5; // Longer tail
+
+        gainNode.gain.setValueAtTime(0, state.audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(volume, state.audioContext.currentTime + attack);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, state.audioContext.currentTime + decay);
+
         oscillator.connect(gainNode).connect(state.audioContext.destination);
         oscillator.start();
-        oscillator.stop(state.audioContext.currentTime + 1.2);
+        oscillator.stop(state.audioContext.currentTime + decay);
+
+        // Oscillator 2 (Harmonic overtone for "glassy" sound)
+        if (type === 'sine') {
+            const osc2 = state.audioContext.createOscillator();
+            const gain2 = state.audioContext.createGain();
+            osc2.type = 'triangle';
+            osc2.frequency.setValueAtTime(freq * 2, state.audioContext.currentTime); // Octave up
+
+            gain2.gain.setValueAtTime(0, state.audioContext.currentTime);
+            gain2.gain.linearRampToValueAtTime(volume * 0.15, state.audioContext.currentTime + attack);
+            gain2.gain.exponentialRampToValueAtTime(0.001, state.audioContext.currentTime + decay * 0.7);
+
+            osc2.connect(gain2).connect(state.audioContext.destination);
+            osc2.start();
+            osc2.stop(state.audioContext.currentTime + decay);
+        }
     },
 
     playChord(chord, volume) {
-        chord.forEach(freq => this.playSound(freq, volume, 'triangle'));
+        // Staggered strum
+        chord.forEach((freq, index) => {
+            setTimeout(() => {
+                this.playSound(freq, volume, 'sine');
+            }, index * 60);
+        });
     },
 
     handleInteraction(e) {
@@ -160,6 +208,19 @@ export const App = {
         if (state.isPaused) return;
 
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // Draw Background Stars
+        state.backgroundStars.forEach(star => {
+            star.opacity += star.speed;
+            if (star.opacity > 1 || star.opacity < 0.1) star.speed *= -1;
+
+            this.ctx.globalAlpha = Math.abs(star.opacity) * 0.6;
+            this.ctx.fillStyle = "#e0e0ff";
+            this.ctx.beginPath();
+            this.ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+            this.ctx.fill();
+        });
+        this.ctx.globalAlpha = 1.0;
 
         state.seeds.forEach(seed => {
             seed.update();
