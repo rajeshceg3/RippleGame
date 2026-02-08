@@ -14,13 +14,17 @@ export const App = {
         this.loadState(); // Load progress before anything else
 
         // Initialize Background Stars
-        for (let i = 0; i < 150; i++) {
+        // Increased count and improved variance for a better "sky"
+        for (let i = 0; i < 200; i++) {
+            const z = Math.random(); // Depth factor 0 (far) to 1 (near)
             state.backgroundStars.push({
                 x: Math.random() * window.innerWidth,
                 y: Math.random() * window.innerHeight,
-                size: Math.random() * 1.5,
-                opacity: Math.random(),
-                speed: Math.random() * 0.01 + 0.002
+                size: Math.random() * 2 * z + 0.5,
+                opacity: Math.random() * 0.8 + 0.2,
+                speed: (Math.random() * 0.02 + 0.005) * z,
+                z: z, // For parallax
+                hue: Math.random() > 0.8 ? 200 + Math.random() * 60 : 50 // Mostly blue/white, some gold
             });
         }
 
@@ -31,9 +35,20 @@ export const App = {
         window.addEventListener('resize', () => this.resizeCanvas());
         window.addEventListener('mousedown', (e) => this.handleInteraction(e));
         window.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            this.handleInteraction(e);
+            // e.preventDefault(); // Removed to allow UI clicks, handled in CSS or specific elements if needed
+            // Actually, keep preventDefault for canvas but check target?
+            // Canvas covers everything, UI is on top.
+            if(e.target === this.canvas) {
+                 e.preventDefault();
+                 this.handleInteraction(e);
+            }
+        }, { passive: false });
+
+        window.addEventListener('mousemove', (e) => {
+            state.mouse.x = e.clientX;
+            state.mouse.y = e.clientY;
         });
+
         document.addEventListener('visibilitychange', () => this.handleVisibilityChange());
 
         this.animate();
@@ -111,21 +126,29 @@ export const App = {
     },
 
     resizeCanvas() {
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
+        const dpr = window.devicePixelRatio || 1;
+        this.canvas.width = window.innerWidth * dpr;
+        this.canvas.height = window.innerHeight * dpr;
+        this.canvas.style.width = `${window.innerWidth}px`;
+        this.canvas.style.height = `${window.innerHeight}px`;
+        this.ctx.scale(dpr, dpr);
         this.repositionElements();
     },
 
     repositionElements() {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
         state.seeds.forEach(seed => {
-            seed.x = Math.max(0, Math.min(this.canvas.width, seed.x));
-            seed.y = Math.max(0, Math.min(this.canvas.height, seed.y));
+            seed.x = Math.max(0, Math.min(width, seed.x));
+            seed.y = Math.max(0, Math.min(height, seed.y));
+            seed.canvas = { width, height }; // Update boundary reference
         });
 
         // Redistribute stars on resize
         state.backgroundStars.forEach(star => {
-            star.x = Math.random() * this.canvas.width;
-            star.y = Math.random() * this.canvas.height;
+            star.x = Math.random() * width;
+            star.y = Math.random() * height;
         });
     },
 
@@ -183,7 +206,9 @@ export const App = {
         if (!state.isInitialized) {
             state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
             this.introMessage.style.opacity = '0';
-            for (let i = 0; i < 5; i++) { state.seeds.push(new LightSeed(this.canvas)); }
+            // Pass the logical canvas size to LightSeed
+            const logicalCanvas = { width: window.innerWidth, height: window.innerHeight };
+            for (let i = 0; i < 5; i++) { state.seeds.push(new LightSeed(logicalCanvas)); }
             state.isInitialized = true;
         }
 
@@ -207,17 +232,31 @@ export const App = {
     animate() {
         if (state.isPaused) return;
 
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        // Clear based on logical size
+        this.ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
         // Draw Background Stars
+        const centerX = window.innerWidth / 2;
+        const centerY = window.innerHeight / 2;
+
         state.backgroundStars.forEach(star => {
             star.opacity += star.speed;
             if (star.opacity > 1 || star.opacity < 0.1) star.speed *= -1;
 
-            this.ctx.globalAlpha = Math.abs(star.opacity) * 0.6;
-            this.ctx.fillStyle = "#e0e0ff";
+            // Parallax shift
+            const moveX = (state.mouse.x - centerX) * star.z * 0.05;
+            const moveY = (state.mouse.y - centerY) * star.z * 0.05;
+
+            this.ctx.globalAlpha = Math.abs(star.opacity) * (0.5 + star.z * 0.5);
+            // Dynamic color
+            if (star.hue === 50) {
+                 this.ctx.fillStyle = `hsl(50, 100%, 80%)`; // Goldish
+            } else {
+                 this.ctx.fillStyle = `hsl(${star.hue}, 80%, 90%)`; // Blueish
+            }
+
             this.ctx.beginPath();
-            this.ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+            this.ctx.arc(star.x + moveX, star.y + moveY, star.size, 0, Math.PI * 2);
             this.ctx.fill();
         });
         this.ctx.globalAlpha = 1.0;
@@ -293,7 +332,8 @@ export const App = {
                         state.blooms.push(new Bloom(seed.x, seed.y));
                         this.playChord(config.BLOOM_CHORD, 0.3);
                         state.seeds.splice(sIndex, 1);
-                        setTimeout(() => state.seeds.push(new LightSeed(this.canvas)), 2000);
+                        // Make sure new seed gets the canvas dimensions reference
+                        setTimeout(() => state.seeds.push(new LightSeed({ width: window.innerWidth, height: window.innerHeight })), 2000);
                     }
                 }
             });
