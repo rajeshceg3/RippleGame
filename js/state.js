@@ -8,6 +8,7 @@ export const state = {
     ripples: [],
     seeds: [],
     blooms: [],
+    backgroundStars: [],
 
     // --- Interaction ---
     lastTap: { time: 0, x: 0, y: 0 },
