@@ -12,6 +12,7 @@ export const state = {
 
     // --- Interaction ---
     lastTap: { time: 0, x: 0, y: 0 },
+    mouse: { x: 0, y: 0 }, // For parallax effect
 
     // --- Audio ---
     audioContext: null,

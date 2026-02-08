@@ -9,9 +9,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         :root {
-            --color-deep-space: #050511;
-            --color-nebula-blue: #1a1a40;
-            --color-nebula-purple: #2a0a38;
+            --color-deep-space: #020010;
+            --color-nebula-blue: #14143a;
+            --color-nebula-purple: #250535;
             --color-starlight: #e0e0ff;
             --color-gold: #ffd700;
             --font-display: 'Cinzel', serif;
@@ -26,9 +26,11 @@
             position: absolute;
             top: 0;
             left: 0;
-            background: linear-gradient(135deg, #020024, #0e0e36, #1c0b2b); /* Deeper, more cosmic gradient */
-            background-size: 300% 300%;
-            animation: gradientShift 240s ease infinite; /* Slower, more subtle shift */
+            background:
+                radial-gradient(circle at 50% 50%, rgba(20, 20, 60, 0.3) 0%, rgba(2, 0, 16, 0.9) 100%),
+                linear-gradient(135deg, #020024, #09092b, #150520);
+            background-size: 100% 100%, 300% 300%;
+            animation: gradientShift 180s ease infinite;
         }
 
         #intro-message {
@@ -36,80 +38,153 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            color: rgba(224, 224, 255, 0.6);
+            color: var(--color-starlight);
             font-family: var(--font-display);
-            font-size: 1.5rem;
+            font-size: 1.8rem;
+            font-weight: 700;
             text-align: center;
-            letter-spacing: 0.2rem;
+            letter-spacing: 0.4rem;
+            text-transform: uppercase;
             pointer-events: none;
             opacity: 1;
-            transition: opacity 0.8s ease;
-            text-shadow: 0 0 10px rgba(224, 224, 255, 0.3);
-            animation: pulseText 4s infinite ease-in-out;
+            transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+            text-shadow: 0 0 20px rgba(224, 224, 255, 0.5), 0 0 40px rgba(224, 224, 255, 0.2);
+            animation: pulseText 5s infinite ease-in-out;
+            width: 100%;
+            padding: 0 20px;
+            box-sizing: border-box;
         }
 
         @keyframes pulseText {
-            0%, 100% { opacity: 0.8; transform: translate(-50%, -50%) scale(1); }
-            50% { opacity: 0.5; transform: translate(-50%, -50%) scale(0.98); }
+            0%, 100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); filter: blur(0px); }
+            50% { opacity: 0.4; transform: translate(-50%, -50%) scale(0.95); filter: blur(1px); }
         }
 
-        @keyframes gradientShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        @keyframes gradientShift {
+            0% { background-position: center, 0% 50%; }
+            50% { background-position: center, 100% 50%; }
+            100% { background-position: center, 0% 50%; }
+        }
 
         /* --- Astral Codex UI --- */
-        #codex-button { position: absolute; top: 20px; right: 20px; font-size: 2.5rem; cursor: pointer; user-select: none; z-index: 100; transition: transform 0.4s ease, filter 0.4s ease; filter: drop-shadow(0 0 5px rgba(255,255,255,0.3)); }
-        #codex-button:hover { transform: scale(1.1) rotate(10deg); filter: drop-shadow(0 0 10px rgba(255,215,0,0.6)); }
+        #codex-button {
+            position: absolute; top: 30px; right: 30px;
+            font-size: 2.5rem; cursor: pointer; user-select: none; z-index: 100;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            filter: drop-shadow(0 0 8px rgba(255,215,0,0.2));
+            opacity: 0.8;
+        }
+        #codex-button:hover {
+            transform: scale(1.15) rotate(15deg);
+            filter: drop-shadow(0 0 15px rgba(255,215,0,0.8));
+            opacity: 1;
+        }
 
         #codex-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(5, 5, 17, 0.6);
-            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+            background: rgba(2, 0, 10, 0.75);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
             z-index: 99; display: flex; justify-content: center; align-items: center;
-            opacity: 1; transition: opacity 0.4s ease, visibility 0.4s ease;
+            opacity: 1; transition: opacity 0.5s ease, visibility 0.5s ease;
         }
         #codex-overlay.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
 
         #codex-content {
             color: var(--color-starlight);
-            background: rgba(26, 26, 64, 0.6);
-            padding: 3rem 5rem;
-            border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+            padding: 4rem 6rem;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
             text-align: center;
             font-family: var(--font-body);
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-            transform: scale(1);
-            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow:
+                0 20px 50px rgba(0,0,0,0.6),
+                inset 0 0 30px rgba(255,255,255,0.02);
+            transform: scale(1) translateY(0);
+            transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+            position: relative;
         }
-        #codex-overlay.hidden #codex-content { transform: scale(0.9); }
+
+        /* Subtle shimmer effect on the border */
+        #codex-content::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: 24px; padding: 1px;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+        }
+
+        #codex-overlay.hidden #codex-content { transform: scale(0.95) translateY(20px); }
 
         #codex-content h2 {
-            margin-top: 0; letter-spacing: 0.3rem; text-transform: uppercase;
+            margin-top: 0; letter-spacing: 0.5rem; text-transform: uppercase;
             font-family: var(--font-display); font-weight: 700; color: var(--color-gold);
-            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
-            margin-bottom: 2rem;
+            text-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+            margin-bottom: 2.5rem;
+            font-size: 2rem;
+            position: relative;
+            display: inline-block;
         }
 
-        #codex-list { list-style: none; padding: 0; margin: 2rem 0; min-width: 300px; }
+        #codex-content h2::after {
+            content: ''; display: block; width: 60px; height: 2px;
+            background: var(--color-gold); margin: 10px auto 0;
+            box-shadow: 0 0 10px var(--color-gold);
+        }
+
+        #codex-list { list-style: none; padding: 0; margin: 2rem 0; min-width: 350px; }
         #codex-list li {
-            font-size: 1.4rem; padding: 0.8rem 0; opacity: 0;
-            letter-spacing: 0.15rem; border-bottom: 1px solid rgba(255,255,255,0.05);
-            animation: fadeInItem 0.5s ease forwards;
+            font-size: 1.2rem; padding: 1rem 0; opacity: 0;
+            letter-spacing: 0.2rem; border-bottom: 1px solid rgba(255,255,255,0.08);
+            animation: fadeInItem 0.6s ease forwards;
+            display: flex; justify-content: center; align-items: center;
         }
         #codex-list li:last-child { border-bottom: none; }
-        #codex-list li.empty { font-style: italic; opacity: 0.6; font-size: 1.1rem; }
+        #codex-list li.empty { font-style: italic; opacity: 0.5; font-size: 1rem; letter-spacing: 0.05rem; }
 
-        @keyframes fadeInItem { from { opacity: 0; transform: translateY(10px); } to { opacity: 0.9; transform: translateY(0); } }
+        #codex-list li::before {
+            content: '✧'; margin-right: 15px; color: var(--color-gold); font-size: 0.8em; opacity: 0.7;
+        }
+        #codex-list li.empty::before { content: none; }
+
+        @keyframes fadeInItem { from { opacity: 0; transform: translateY(15px); } to { opacity: 0.9; transform: translateY(0); } }
 
         #codex-close, #codex-share {
-            cursor: pointer; margin-top: 1.5rem; padding: 0.8rem 2rem;
-            border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 30px;
-            display: inline-block; transition: all 0.3s ease; margin: 0 0.5rem;
-            font-weight: 600; text-transform: uppercase; font-size: 0.9rem; letter-spacing: 0.1rem;
+            cursor: pointer; margin-top: 2rem; padding: 1rem 2.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 50px;
+            display: inline-block; transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); margin: 0 0.8rem;
+            font-weight: 600; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.2rem;
+            background: rgba(255,255,255,0.02);
         }
         #codex-close:hover, #codex-share:hover {
-            background: rgba(255, 255, 255, 0.15); border-color: #fff; transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            text-shadow: 0 0 5px rgba(255,255,255,0.8);
+            background: rgba(255, 255, 255, 0.1); border-color: rgba(255,255,255,0.6);
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2), 0 0 10px rgba(255,255,255,0.2);
+            text-shadow: 0 0 8px rgba(255,255,255,0.6);
+        }
+
+        /* --- Mobile Optimization --- */
+        @media (max-width: 768px) {
+            #codex-button { top: auto; bottom: 30px; right: 30px; font-size: 3rem; }
+
+            #codex-content {
+                width: 100%; height: 70%; bottom: 0; position: absolute; top: auto;
+                border-radius: 30px 30px 0 0;
+                padding: 2rem 1.5rem;
+                max-width: 100%;
+                transform: translateY(0);
+                border-bottom: none;
+            }
+            #codex-overlay.hidden #codex-content { transform: translateY(100%); }
+
+            #codex-list { min-width: auto; width: 100%; }
+            #codex-content h2 { font-size: 1.5rem; letter-spacing: 0.3rem; }
+
+            #codex-close, #codex-share { padding: 1rem 1.5rem; width: 80%; margin: 0.5rem 0; display: block; box-sizing: border-box; text-align: center; }
         }
     </style>
 </head>
