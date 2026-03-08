@@ -1,5 +1,5 @@
 import { state, config } from './state.js';
-import { Ripple, LightSeed, Bloom, ConstellationNode } from './entities.js';
+import { Ripple, LightSeed, Bloom, ConstellationEntity, StardustParticle } from './entities.js';
 import { ConstellationManager } from './constellation.js';
 import { UI } from './ui.js';
 
@@ -47,7 +47,25 @@ export const App = {
         window.addEventListener('mousemove', (e) => {
             state.mouse.x = e.clientX;
             state.mouse.y = e.clientY;
+
+            // Add Stardust
+            if (state.isInitialized && Math.random() > 0.5) {
+                state.stardust.push(new StardustParticle(e.clientX, e.clientY));
+            }
         });
+
+        window.addEventListener('touchmove', (e) => {
+            if (e.touches && e.touches.length > 0) {
+                const touch = e.touches[0];
+                state.mouse.x = touch.clientX;
+                state.mouse.y = touch.clientY;
+
+                // Add Stardust
+                if (state.isInitialized && Math.random() > 0.3) {
+                    state.stardust.push(new StardustParticle(touch.clientX, touch.clientY));
+                }
+            }
+        }, { passive: true });
 
         document.addEventListener('visibilitychange', () => this.handleVisibilityChange());
 
@@ -96,21 +114,16 @@ export const App = {
     applyState(newState) {
         // Clear any existing state before applying the new one
         state.unlockedConstellations = [];
-        state.constellationNodes = [];
+        state.constellationEntities = [];
 
         state.unlockedConstellations = newState.unlockedConstellations;
 
-        // Re-create the visual nodes from the loaded data
+        // Re-create the visual entities from the loaded data
         state.unlockedConstellations.forEach(constellationData => {
             const definition = ConstellationManager.definitions[constellationData.key];
             if (definition) {
-                definition.nodes.forEach(nodeOffset => {
-                    const nodeX = constellationData.x + nodeOffset.x;
-                    const nodeY = constellationData.y + nodeOffset.y;
-                    const node = new ConstellationNode(nodeX, nodeY);
-                    node.opacity = 1; // Make them instantly visible
-                    state.constellationNodes.push(node);
-                });
+                const entity = new ConstellationEntity(definition, constellationData.x, constellationData.y, true);
+                state.constellationEntities.push(entity);
             }
         });
     },
@@ -150,6 +163,59 @@ export const App = {
             star.x = Math.random() * width;
             star.y = Math.random() * height;
         });
+    },
+
+    initAmbientAudio() {
+        if (!state.audioContext) return;
+        state.ambientGain = state.audioContext.createGain();
+        state.ambientGain.gain.setValueAtTime(0, state.audioContext.currentTime);
+        state.ambientGain.connect(state.audioContext.destination);
+
+        const baseFrequencies = [130.81, 196.00]; // Low C3, G3
+
+        baseFrequencies.forEach(freq => {
+            const osc = state.audioContext.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, state.audioContext.currentTime);
+
+            // LFO for slow volume panning/modulation
+            const lfo = state.audioContext.createOscillator();
+            lfo.type = 'sine';
+            lfo.frequency.setValueAtTime(0.05 + Math.random() * 0.05, state.audioContext.currentTime); // very slow
+
+            const lfoGain = state.audioContext.createGain();
+            lfoGain.gain.setValueAtTime(0.2, state.audioContext.currentTime); // depth of modulation
+
+            lfo.connect(lfoGain.gain);
+            osc.connect(lfoGain).connect(state.ambientGain);
+
+            osc.start();
+            lfo.start();
+
+            state.ambientOscillators.push({ osc, lfoGain });
+        });
+    },
+
+    updateAmbientAudio() {
+        if (!state.ambientGain) return;
+
+        // Base volume is extremely low
+        let targetVolume = 0.01;
+
+        // Increase volume slightly based on unlocked constellations
+        if (state.unlockedConstellations && state.unlockedConstellations.length > 0) {
+            targetVolume = Math.min(0.08, targetVolume + (state.unlockedConstellations.length * 0.015));
+        }
+
+        // Add a bit more volume if seeds are high energy
+        const totalEnergy = state.seeds.reduce((sum, seed) => sum + seed.energy, 0);
+        targetVolume += (totalEnergy * 0.002);
+
+        // Ensure it stays subtle
+        targetVolume = Math.min(0.12, targetVolume);
+
+        // Smooth transition to target volume
+        state.ambientGain.gain.setTargetAtTime(targetVolume, state.audioContext.currentTime, 2.0);
     },
 
     playSound(freq, volume = 0.2, type = 'sine') {
@@ -205,6 +271,7 @@ export const App = {
     handleInteraction(e) {
         if (!state.isInitialized) {
             state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            this.initAmbientAudio();
             this.introMessage.style.opacity = '0';
             // Pass the logical canvas size to LightSeed
             const logicalCanvas = { width: window.innerWidth, height: window.innerHeight };
@@ -231,6 +298,11 @@ export const App = {
 
     animate() {
         if (state.isPaused) return;
+
+        // Update ambient audio dynamic volume
+        if (state.isInitialized) {
+            this.updateAmbientAudio();
+        }
 
         // Clear based on logical size
         this.ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
@@ -266,10 +338,16 @@ export const App = {
             seed.draw(this.ctx);
         });
 
-        state.constellationNodes.forEach(node => {
-            node.update();
-            node.draw(this.ctx);
+        state.constellationEntities.forEach(entity => {
+            entity.update();
+            entity.draw(this.ctx);
         });
+
+        state.stardust.forEach(particle => {
+            particle.update();
+            particle.draw(this.ctx);
+        });
+        state.stardust = state.stardust.filter(p => p.life > 0);
 
         state.ripples.forEach(ripple => {
             ripple.update();
@@ -311,14 +389,11 @@ export const App = {
                                 console.error("Could not save to localStorage:", error);
                             }
 
-                            // Create the visual entities (the nodes) for the constellation
+                            // Create the visual entities for the constellation
                             const definition = ConstellationManager.definitions[unlockedKey];
                             if (definition) {
-                                definition.nodes.forEach(nodeOffset => {
-                                    const nodeX = newConstellationData.x + nodeOffset.x;
-                                    const nodeY = newConstellationData.y + nodeOffset.y;
-                                    state.constellationNodes.push(new ConstellationNode(nodeX, nodeY));
-                                });
+                                const entity = new ConstellationEntity(definition, newConstellationData.x, newConstellationData.y, false);
+                                state.constellationEntities.push(entity);
                             }
                         }
 
