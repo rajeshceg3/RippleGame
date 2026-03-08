@@ -9,6 +9,7 @@ export const state = {
     seeds: [],
     blooms: [],
     backgroundStars: [],
+    stardust: [],
 
     // --- Interaction ---
     lastTap: { time: 0, x: 0, y: 0 },
@@ -17,11 +18,13 @@ export const state = {
     // --- Audio ---
     audioContext: null,
     lastSoundTime: 0,
+    ambientGain: null,
+    ambientOscillators: [],
 
     // --- "Project Constellation" State ---
     noteSequence: [], // Tracks the last few notes the user has played
     unlockedConstellations: [], // Stores the data of unlocked constellations (key, center)
-    constellationNodes: [], // Stores the actual node entities for rendering
+    constellationEntities: [], // Stores the actual constellation entities for rendering
 };
 
 export const config = {

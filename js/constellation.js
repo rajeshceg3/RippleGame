@@ -7,6 +7,12 @@ const HARMONIC_SEQUENCES = {
     LYRA: [1, 2, 3],
     // A more complex 4-note sequence
     ORION: [3, 2, 1, 0],
+    // W shape
+    CASSIOPEIA: [0, 2, 1, 3, 2],
+    // Cross shape
+    CYGNUS: [2, 3, 4, 3, 2],
+    // Dipper shape
+    URSA_MINOR: [1, 1, 2, 2, 3],
 };
 
 // Defines the structure of the constellations themselves.
@@ -19,6 +25,9 @@ const CONSTELLATIONS = {
             { x: 0, y: -30 },
             { x: -50, y: 20 },
             { x: 50, y: 20 },
+        ],
+        edges: [
+            [0, 1], [0, 2], [1, 2]
         ]
     },
     ORION: {
@@ -31,6 +40,51 @@ const CONSTELLATIONS = {
             { x: 40, y: 0 },
             { x: -30, y: 50 },
             { x: 30, y: 50 },
+        ],
+        edges: [
+            [0, 1], [0, 2], [1, 4], [2, 3], [3, 4], [2, 5], [4, 6]
+        ]
+    },
+    CASSIOPEIA: {
+        name: 'Cassiopeia',
+        nodes: [
+            { x: -60, y: -20 },
+            { x: -30, y: 30 },
+            { x: 0, y: 0 },
+            { x: 30, y: 40 },
+            { x: 60, y: -10 },
+        ],
+        edges: [
+            [0, 1], [1, 2], [2, 3], [3, 4]
+        ]
+    },
+    CYGNUS: {
+        name: 'Cygnus',
+        nodes: [
+            { x: 0, y: -60 },
+            { x: 0, y: -20 },
+            { x: 0, y: 20 },
+            { x: 0, y: 60 },
+            { x: -40, y: -10 },
+            { x: 40, y: -10 },
+        ],
+        edges: [
+            [0, 1], [1, 2], [2, 3], [1, 4], [1, 5]
+        ]
+    },
+    URSA_MINOR: {
+        name: 'Ursa Minor',
+        nodes: [
+            { x: -70, y: 30 },
+            { x: -40, y: 10 },
+            { x: -10, y: 0 },
+            { x: 20, y: -20 },
+            { x: 60, y: -30 },
+            { x: 30, y: 20 },
+            { x: 70, y: 10 },
+        ],
+        edges: [
+            [0, 1], [1, 2], [2, 3], [3, 4], [4, 6], [6, 5], [5, 3]
         ]
     }
 };

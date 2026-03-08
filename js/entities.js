@@ -55,6 +55,52 @@ export class Ripple {
     }
 }
 
+export class ConstellationEntity {
+    constructor(definition, centerX, centerY, instantReveal = false) {
+        this.nodes = definition.nodes.map(n => {
+            const node = new ConstellationNode(centerX + n.x, centerY + n.y);
+            if (instantReveal) node.opacity = 1;
+            return node;
+        });
+        this.edges = definition.edges || [];
+        this.opacity = instantReveal ? 1 : 0;
+    }
+
+    update() {
+        if (this.opacity < 1) {
+            this.opacity += 0.01;
+        }
+        this.nodes.forEach(node => node.update());
+    }
+
+    draw(ctx) {
+        // Draw edges first so they are behind the nodes
+        if (this.edges.length > 0 && this.opacity > 0) {
+            ctx.strokeStyle = `rgba(200, 220, 255, ${this.opacity * 0.4})`;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            this.edges.forEach(edge => {
+                const startNode = this.nodes[edge[0]];
+                const endNode = this.nodes[edge[1]];
+                if (startNode && endNode) {
+                    ctx.moveTo(startNode.x, startNode.y);
+                    ctx.lineTo(endNode.x, endNode.y);
+                }
+            });
+            ctx.stroke();
+
+            // Subtle glow for the lines
+            ctx.shadowColor = "rgba(200, 220, 255, 0.5)";
+            ctx.shadowBlur = 5;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        // Draw nodes
+        this.nodes.forEach(node => node.draw(ctx));
+    }
+}
+
 export class LightSeed {
     constructor(canvas) {
         this.canvas = canvas;
@@ -193,6 +239,34 @@ class BloomParticle {
         ctx.fill();
         ctx.shadowBlur = 0;
 
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+export class StardustParticle {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.life = 1.0;
+        this.size = Math.random() * 2 + 0.5;
+        this.vx = (Math.random() - 0.5) * 0.5;
+        this.vy = (Math.random() - 0.5) * 0.5;
+        this.hue = Math.random() > 0.8 ? 50 : 220; // Gold or blueish
+    }
+
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= 0.02; // Fade out quickly
+    }
+
+    draw(ctx) {
+        if (this.life <= 0) return;
+        ctx.globalAlpha = this.life;
+        ctx.fillStyle = `hsl(${this.hue}, 80%, 80%)`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
         ctx.globalAlpha = 1.0;
     }
 }
