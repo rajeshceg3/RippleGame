@@ -63,6 +63,7 @@ export class ConstellationEntity {
             return node;
         });
         this.edges = definition.edges || [];
+        this.edgeProgress = instantReveal ? 1 : 0;
         this.opacity = instantReveal ? 1 : 0;
     }
 
@@ -70,30 +71,59 @@ export class ConstellationEntity {
         if (this.opacity < 1) {
             this.opacity += 0.01;
         }
+        if (this.edgeProgress < 1) {
+            this.edgeProgress += 0.005; // Control drawing speed
+        }
         this.nodes.forEach(node => node.update());
     }
 
     draw(ctx) {
         // Draw edges first so they are behind the nodes
         if (this.edges.length > 0 && this.opacity > 0) {
-            ctx.strokeStyle = `rgba(200, 220, 255, ${this.opacity * 0.4})`;
             ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            this.edges.forEach(edge => {
-                const startNode = this.nodes[edge[0]];
-                const endNode = this.nodes[edge[1]];
-                if (startNode && endNode) {
-                    ctx.moveTo(startNode.x, startNode.y);
-                    ctx.lineTo(endNode.x, endNode.y);
+
+            this.edges.forEach((edge, index) => {
+                // Stagger the drawing of edges based on their index
+                const delay = index * 0.1;
+                const progress = Math.max(0, Math.min(1, (this.edgeProgress - delay) * 2)); // Scale to 0-1 range
+
+                if (progress > 0) {
+                    const startNode = this.nodes[edge[0]];
+                    const endNode = this.nodes[edge[1]];
+
+                    if (startNode && endNode) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = `rgba(200, 220, 255, ${this.opacity * 0.4})`;
+                        ctx.moveTo(startNode.x, startNode.y);
+
+                        // Calculate intermediate point based on progress
+                        const currentX = startNode.x + (endNode.x - startNode.x) * progress;
+                        const currentY = startNode.y + (endNode.y - startNode.y) * progress;
+
+                        ctx.lineTo(currentX, currentY);
+                        ctx.stroke();
+
+                        // Subtle glow for the lines
+                        ctx.shadowColor = "rgba(200, 220, 255, 0.5)";
+                        ctx.shadowBlur = 5;
+                        ctx.stroke();
+                        ctx.shadowBlur = 0;
+
+                        // Draw leading spark if still drawing
+                        if (progress < 1) {
+                            ctx.fillStyle = `rgba(255, 255, 255, ${this.opacity})`;
+                            ctx.beginPath();
+                            ctx.arc(currentX, currentY, 2, 0, Math.PI * 2);
+                            ctx.fill();
+
+                            ctx.shadowColor = "#fff";
+                            ctx.shadowBlur = 10;
+                            ctx.fill();
+                            ctx.shadowBlur = 0;
+                        }
+                    }
                 }
             });
-            ctx.stroke();
-
-            // Subtle glow for the lines
-            ctx.shadowColor = "rgba(200, 220, 255, 0.5)";
-            ctx.shadowBlur = 5;
-            ctx.stroke();
-            ctx.shadowBlur = 0;
         }
 
         // Draw nodes
@@ -252,18 +282,47 @@ export class StardustParticle {
         this.vx = (Math.random() - 0.5) * 0.5;
         this.vy = (Math.random() - 0.5) * 0.5;
         this.hue = Math.random() > 0.8 ? 50 : 220; // Gold or blueish
+        this.brightness = 80;
     }
 
-    update() {
+    update(ripples = []) {
         this.x += this.vx;
         this.y += this.vy;
+
+        // Damping for velocity spikes
+        this.vx *= 0.95;
+        this.vy *= 0.95;
+
+        if (this.brightness > 80) this.brightness -= 2;
+
+        // React to ripples
+        ripples.forEach(ripple => {
+            const dx = this.x - ripple.x;
+            const dy = this.y - ripple.y;
+            const dist = Math.hypot(dx, dy);
+
+            // Check if particle is near the edge of the expanding wave
+            if (Math.abs(dist - ripple.radius) < 15 && ripple.radius > 5) {
+                const angle = Math.atan2(dy, dx);
+                const pushForce = ripple.isPulse ? 3 : 1;
+
+                // Add velocity outwards
+                this.vx += Math.cos(angle) * pushForce;
+                this.vy += Math.sin(angle) * pushForce;
+
+                // Increase life and brightness slightly
+                this.life = Math.min(1.0, this.life + 0.3);
+                this.brightness = 100;
+            }
+        });
+
         this.life -= 0.02; // Fade out quickly
     }
 
     draw(ctx) {
         if (this.life <= 0) return;
         ctx.globalAlpha = this.life;
-        ctx.fillStyle = `hsl(${this.hue}, 80%, 80%)`;
+        ctx.fillStyle = `hsl(${this.hue}, 80%, ${this.brightness}%)`;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
         ctx.fill();

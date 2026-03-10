@@ -165,11 +165,45 @@ export const App = {
         });
     },
 
+    createReverb() {
+        if (!state.audioContext) return null;
+        const sampleRate = state.audioContext.sampleRate;
+        const length = sampleRate * 3; // 3 seconds reverb
+        const impulse = state.audioContext.createBuffer(2, length, sampleRate);
+        const left = impulse.getChannelData(0);
+        const right = impulse.getChannelData(1);
+
+        for (let i = 0; i < length; i++) {
+            const decay = Math.exp(-i / (sampleRate * 1.5)); // Exponential decay
+            left[i] = (Math.random() * 2 - 1) * decay;
+            right[i] = (Math.random() * 2 - 1) * decay;
+        }
+
+        const convolver = state.audioContext.createConvolver();
+        convolver.buffer = impulse;
+        return convolver;
+    },
+
     initAmbientAudio() {
         if (!state.audioContext) return;
+
+        // Master Gain
+        state.masterGain = state.audioContext.createGain();
+        state.masterGain.gain.setValueAtTime(0.8, state.audioContext.currentTime);
+        state.masterGain.connect(state.audioContext.destination);
+
+        // Setup Reverb
+        state.reverbNode = this.createReverb();
+        state.reverbGain = state.audioContext.createGain();
+        state.reverbGain.gain.setValueAtTime(0.4, state.audioContext.currentTime); // Wet mix level
+        if (state.reverbNode) {
+            state.reverbNode.connect(state.reverbGain);
+            state.reverbGain.connect(state.masterGain);
+        }
+
         state.ambientGain = state.audioContext.createGain();
         state.ambientGain.gain.setValueAtTime(0, state.audioContext.currentTime);
-        state.ambientGain.connect(state.audioContext.destination);
+        state.ambientGain.connect(state.masterGain);
 
         const baseFrequencies = [130.81, 196.00]; // Low C3, G3
 
@@ -218,12 +252,28 @@ export const App = {
         state.ambientGain.gain.setTargetAtTime(targetVolume, state.audioContext.currentTime, 2.0);
     },
 
-    playSound(freq, volume = 0.2, type = 'sine') {
+    playSound(freq, volume = 0.2, type = 'sine', x = null) {
         const now = Date.now();
         if (!state.audioContext) return;
         // Relaxed cooldown check to allow more polyphony, but keeping it to prevent explosion
         if (now - state.lastSoundTime < 20) return;
         state.lastSoundTime = now;
+
+        // Set up Spatial Audio Panner
+        const panner = state.audioContext.createStereoPanner();
+        if (x !== null) {
+            // Map x to -1 (left) to 1 (right)
+            const panValue = (x / window.innerWidth) * 2 - 1;
+            panner.pan.setValueAtTime(panValue, state.audioContext.currentTime);
+        } else {
+            panner.pan.setValueAtTime(0, state.audioContext.currentTime);
+        }
+
+        // Connect panner to dry mix and reverb (wet mix)
+        panner.connect(state.masterGain);
+        if (state.reverbNode) {
+            panner.connect(state.reverbNode);
+        }
 
         // Oscillator 1 (Fundamental)
         const oscillator = state.audioContext.createOscillator();
@@ -238,7 +288,7 @@ export const App = {
         gainNode.gain.linearRampToValueAtTime(volume, state.audioContext.currentTime + attack);
         gainNode.gain.exponentialRampToValueAtTime(0.001, state.audioContext.currentTime + decay);
 
-        oscillator.connect(gainNode).connect(state.audioContext.destination);
+        oscillator.connect(gainNode).connect(panner);
         oscillator.start();
         oscillator.stop(state.audioContext.currentTime + decay);
 
@@ -253,17 +303,17 @@ export const App = {
             gain2.gain.linearRampToValueAtTime(volume * 0.15, state.audioContext.currentTime + attack);
             gain2.gain.exponentialRampToValueAtTime(0.001, state.audioContext.currentTime + decay * 0.7);
 
-            osc2.connect(gain2).connect(state.audioContext.destination);
+            osc2.connect(gain2).connect(panner);
             osc2.start();
             osc2.stop(state.audioContext.currentTime + decay);
         }
     },
 
-    playChord(chord, volume) {
+    playChord(chord, volume, x = null) {
         // Staggered strum
         chord.forEach((freq, index) => {
             setTimeout(() => {
-                this.playSound(freq, volume, 'sine');
+                this.playSound(freq, volume, 'sine', x);
             }, index * 60);
         });
     },
@@ -287,11 +337,11 @@ export const App = {
 
         if (timeSinceLastTap < config.DOUBLE_TAP_DELAY && dist < config.DOUBLE_TAP_RADIUS) {
             state.ripples.push(new Ripple(x, y, true));
-            this.playSound(config.PENTATONIC_SCALE[0] / 2, 0.3);
+            this.playSound(config.PENTATONIC_SCALE[0] / 2, 0.3, 'sine', x);
             state.lastTap.time = 0;
         } else {
             state.ripples.push(new Ripple(x, y, false));
-            this.playSound(config.PENTATONIC_SCALE[1], 0.2);
+            this.playSound(config.PENTATONIC_SCALE[1], 0.2, 'sine', x);
         }
         state.lastTap = { time: currentTime, x, y };
     },
@@ -344,7 +394,7 @@ export const App = {
         });
 
         state.stardust.forEach(particle => {
-            particle.update();
+            particle.update(state.ripples);
             particle.draw(this.ctx);
         });
         state.stardust = state.stardust.filter(p => p.life > 0);
@@ -357,7 +407,7 @@ export const App = {
                 const dist = Math.hypot(ripple.x - seed.x, ripple.y - seed.y);
                 if (Math.abs(dist - ripple.radius) < 10) {
                     seed.nudge(ripple.x, ripple.y);
-                    this.playSound(config.PENTATONIC_SCALE[seed.energy], 0.4);
+                    this.playSound(config.PENTATONIC_SCALE[seed.energy], 0.4, 'sine', seed.x);
 
                     // --- Sequence Tracking ---
                     state.noteSequence.push(seed.energy);
@@ -405,7 +455,7 @@ export const App = {
 
                     if (seed.energy >= seed.maxEnergy) {
                         state.blooms.push(new Bloom(seed.x, seed.y));
-                        this.playChord(config.BLOOM_CHORD, 0.3);
+                        this.playChord(config.BLOOM_CHORD, 0.3, seed.x);
                         state.seeds.splice(sIndex, 1);
                         // Make sure new seed gets the canvas dimensions reference
                         setTimeout(() => state.seeds.push(new LightSeed({ width: window.innerWidth, height: window.innerHeight })), 2000);
