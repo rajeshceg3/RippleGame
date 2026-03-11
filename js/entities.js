@@ -1,3 +1,45 @@
+export class ShootingStar {
+    constructor(canvas) {
+        this.canvas = canvas;
+        this.x = Math.random() * canvas.width;
+        this.y = 0;
+        this.speed = Math.random() * 5 + 5;
+        this.angle = Math.PI / 4 + (Math.random() - 0.5) * 0.2; // approx 45 degrees
+        this.length = Math.random() * 80 + 20;
+        this.opacity = 1;
+        this.active = true;
+    }
+
+    update() {
+        this.x -= Math.cos(this.angle) * this.speed;
+        this.y += Math.sin(this.angle) * this.speed;
+        this.opacity -= 0.02;
+
+        if (this.opacity <= 0 || this.x < 0 || this.y > this.canvas.height) {
+            this.active = false;
+        }
+    }
+
+    draw(ctx) {
+        if (!this.active) return;
+
+        ctx.beginPath();
+        const endX = this.x + Math.cos(this.angle) * this.length;
+        const endY = this.y - Math.sin(this.angle) * this.length;
+
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(endX, endY);
+
+        const grad = ctx.createLinearGradient(this.x, this.y, endX, endY);
+        grad.addColorStop(0, `rgba(255, 255, 255, ${this.opacity})`);
+        grad.addColorStop(1, `rgba(255, 255, 255, 0)`);
+
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+}
+
 export class Ripple {
     constructor(x, y, isPulse = false) {
         this.x = x;

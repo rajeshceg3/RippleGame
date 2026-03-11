@@ -14,12 +14,18 @@ export const state = {
     // --- Interaction ---
     lastTap: { time: 0, x: 0, y: 0 },
     mouse: { x: 0, y: 0 }, // For parallax effect
+    isPointerDown: false,
 
     // --- Audio ---
     audioContext: null,
     lastSoundTime: 0,
     ambientGain: null,
     ambientOscillators: [],
+    delayNode: null,
+    feedbackGain: null,
+
+    // --- Background Visuals ---
+    shootingStars: [],
 
     // --- "Project Constellation" State ---
     noteSequence: [], // Tracks the last few notes the user has played

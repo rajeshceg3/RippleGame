@@ -1,5 +1,5 @@
 import { state, config } from './state.js';
-import { Ripple, LightSeed, Bloom, ConstellationEntity, StardustParticle } from './entities.js';
+import { Ripple, LightSeed, Bloom, ConstellationEntity, StardustParticle, ShootingStar } from './entities.js';
 import { ConstellationManager } from './constellation.js';
 import { UI } from './ui.js';
 
@@ -33,16 +33,28 @@ export const App = {
 
         // Attach all event listeners
         window.addEventListener('resize', () => this.resizeCanvas());
-        window.addEventListener('mousedown', (e) => this.handleInteraction(e));
+
+        window.addEventListener('mousedown', (e) => {
+            state.isPointerDown = true;
+            this.handleInteraction(e);
+        });
+        window.addEventListener('mouseup', () => {
+            state.isPointerDown = false;
+        });
+
         window.addEventListener('touchstart', (e) => {
             // e.preventDefault(); // Removed to allow UI clicks, handled in CSS or specific elements if needed
             // Actually, keep preventDefault for canvas but check target?
             // Canvas covers everything, UI is on top.
             if(e.target === this.canvas) {
                  e.preventDefault();
+                 state.isPointerDown = true;
                  this.handleInteraction(e);
             }
         }, { passive: false });
+        window.addEventListener('touchend', () => {
+            state.isPointerDown = false;
+        });
 
         window.addEventListener('mousemove', (e) => {
             state.mouse.x = e.clientX;
@@ -201,6 +213,19 @@ export const App = {
             state.reverbGain.connect(state.masterGain);
         }
 
+        // Setup Delay Line (Echo effect)
+        state.delayNode = state.audioContext.createDelay(1.0); // max 1s
+        state.delayNode.delayTime.setValueAtTime(0.3, state.audioContext.currentTime); // 300ms echo
+        state.feedbackGain = state.audioContext.createGain();
+        state.feedbackGain.gain.setValueAtTime(0.3, state.audioContext.currentTime); // 30% feedback
+
+        state.delayNode.connect(state.feedbackGain);
+        state.feedbackGain.connect(state.delayNode);
+
+        // Connect delay to reverb and master
+        state.delayNode.connect(state.reverbGain);
+        state.delayNode.connect(state.masterGain);
+
         state.ambientGain = state.audioContext.createGain();
         state.ambientGain.gain.setValueAtTime(0, state.audioContext.currentTime);
         state.ambientGain.connect(state.masterGain);
@@ -273,6 +298,9 @@ export const App = {
         panner.connect(state.masterGain);
         if (state.reverbNode) {
             panner.connect(state.reverbNode);
+        }
+        if (state.delayNode) {
+            panner.connect(state.delayNode);
         }
 
         // Oscillator 1 (Fundamental)
@@ -357,6 +385,11 @@ export const App = {
         // Clear based on logical size
         this.ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
+        // Spawn Shooting Stars periodically
+        if (state.isInitialized && Math.random() < 0.005) {
+            state.shootingStars.push(new ShootingStar({ width: window.innerWidth, height: window.innerHeight }));
+        }
+
         // Draw Background Stars
         const centerX = window.innerWidth / 2;
         const centerY = window.innerHeight / 2;
@@ -383,7 +416,26 @@ export const App = {
         });
         this.ctx.globalAlpha = 1.0;
 
+        this.ctx.globalCompositeOperation = 'lighter';
+
+        state.shootingStars.forEach(star => {
+            star.update();
+            star.draw(this.ctx);
+        });
+        state.shootingStars = state.shootingStars.filter(s => s.active);
+
         state.seeds.forEach(seed => {
+            if (state.isPointerDown) {
+                const dx = state.mouse.x - seed.x;
+                const dy = state.mouse.y - seed.y;
+                const distance = Math.hypot(dx, dy);
+                if (distance > 0) {
+                    // Normalize the vector and apply an attractive force
+                    const force = 0.5 / distance;
+                    seed.vx += (dx / distance) * force;
+                    seed.vy += (dy / distance) * force;
+                }
+            }
             seed.update();
             seed.draw(this.ctx);
         });
@@ -471,6 +523,8 @@ export const App = {
 
         state.ripples = state.ripples.filter(r => r.opacity > 0);
         state.blooms = state.blooms.filter(b => b.life > 0);
+
+        this.ctx.globalCompositeOperation = 'source-over';
 
         state.animationFrameId = requestAnimationFrame(() => this.animate());
     }
