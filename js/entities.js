@@ -182,7 +182,7 @@ export class LightSeed {
         this.vy = (Math.random() - 0.5) * 0.2;
         this.radius = 5;
         this.energy = 0;
-        this.maxEnergy = 3;
+        this.maxEnergy = 4;
         // New properties
         this.history = [];
         this.maxHistory = 20;
@@ -199,7 +199,36 @@ export class LightSeed {
         this.pulseSpeed = 0.05 + (this.energy * 0.02);
     }
 
-    update() {
+    update(seeds, mouse) {
+        // Separation and Attraction (Boid-like behavior)
+        if (seeds) {
+            seeds.forEach(otherSeed => {
+                if (otherSeed !== this) {
+                    const dx = this.x - otherSeed.x;
+                    const dy = this.y - otherSeed.y;
+                    const dist = Math.hypot(dx, dy);
+                    // Separation
+                    if (dist > 0 && dist < 100) {
+                        const force = 0.5 / dist;
+                        this.vx += (dx / dist) * force;
+                        this.vy += (dy / dist) * force;
+                    }
+                }
+            });
+        }
+
+        // Gentle attraction to mouse/pointer
+        if (mouse && mouse.x !== 0 && mouse.y !== 0) {
+            const dx = mouse.x - this.x;
+            const dy = mouse.y - this.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist > 0 && dist < 300) {
+                const force = 0.0005;
+                this.vx += dx * force;
+                this.vy += dy * force;
+            }
+        }
+
         this.x += this.vx;
         this.y += this.vy;
         this.vx *= 0.98;

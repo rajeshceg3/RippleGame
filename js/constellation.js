@@ -117,5 +117,35 @@ export const ConstellationManager = {
             }
         }
         return null; // No match
+    },
+
+    /**
+     * Calculates how close the current sequence is to any known Harmonic Sequence.
+     * @param {number[]} sequence - The sequence of notes played by the user.
+     * @returns {number} A value from 0.0 to 1.0 representing the resonance score.
+     */
+    getResonance(sequence) {
+        if (!sequence || sequence.length === 0) return 0;
+        let maxResonance = 0;
+        for (const key in this.sequences) {
+            const req = this.sequences[key];
+            for (let i = 1; i <= req.length; i++) {
+                const subSeq = req.slice(0, i);
+                if (sequence.length >= i) {
+                    const recentNotes = sequence.slice(-i);
+                    let match = true;
+                    for (let j = 0; j < i; j++) {
+                        if (recentNotes[j] !== subSeq[j]) {
+                            match = false;
+                            break;
+                        }
+                    }
+                    if (match) {
+                        maxResonance = Math.max(maxResonance, i / req.length);
+                    }
+                }
+            }
+        }
+        return maxResonance;
     }
 };

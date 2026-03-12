@@ -230,7 +230,7 @@ export const App = {
         state.ambientGain.gain.setValueAtTime(0, state.audioContext.currentTime);
         state.ambientGain.connect(state.masterGain);
 
-        const baseFrequencies = [130.81, 196.00]; // Low C3, G3
+        const baseFrequencies = [130.81, 196.00, 261.63, 392.00]; // Low C3, G3, C4, G4
 
         baseFrequencies.forEach(freq => {
             const osc = state.audioContext.createOscillator();
@@ -269,6 +269,9 @@ export const App = {
         // Add a bit more volume if seeds are high energy
         const totalEnergy = state.seeds.reduce((sum, seed) => sum + seed.energy, 0);
         targetVolume += (totalEnergy * 0.002);
+
+        // Add a substantial swell for active resonance (diegetic feedback)
+        targetVolume += (state.resonance || 0) * 0.05;
 
         // Ensure it stays subtle
         targetVolume = Math.min(0.12, targetVolume);
@@ -394,6 +397,20 @@ export const App = {
         const centerX = window.innerWidth / 2;
         const centerY = window.innerHeight / 2;
 
+        // Calculate and draw dynamic atmospheric resonance glow
+        state.resonance = ConstellationManager.getResonance(state.noteSequence);
+        const resonanceGlow = state.resonance * 0.5;
+        const progressGlow = (state.unlockedConstellations ? state.unlockedConstellations.length : 0) * 0.1;
+        const totalGlow = Math.min(1, resonanceGlow + progressGlow);
+
+        if (totalGlow > 0) {
+            const grad = this.ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(window.innerWidth, window.innerHeight));
+            grad.addColorStop(0, `rgba(30, 10, 50, ${totalGlow * 0.4})`);
+            grad.addColorStop(1, `rgba(0, 0, 0, 0)`);
+            this.ctx.fillStyle = grad;
+            this.ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+        }
+
         state.backgroundStars.forEach(star => {
             star.opacity += star.speed;
             if (star.opacity > 1 || star.opacity < 0.1) star.speed *= -1;
@@ -436,7 +453,7 @@ export const App = {
                     seed.vy += (dy / distance) * force;
                 }
             }
-            seed.update();
+            seed.update(state.seeds, state.mouse);
             seed.draw(this.ctx);
         });
 
@@ -474,6 +491,11 @@ export const App = {
 
                         if (!isAlreadyUnlocked) {
                             console.log(`Unlocked: ${unlockedKey}`);
+
+                                // Diegetic visual feedback: Massive screen-wide shockwave ripple
+                                const shockwave = new Ripple(seed.x, seed.y, true);
+                                shockwave.maxRadius = Math.max(window.innerWidth, window.innerHeight) * 1.5;
+                                state.ripples.push(shockwave);
 
                             // Add the new constellation to the application state
                             const newConstellationData = {
