@@ -36,10 +36,29 @@ export const App = {
 
         window.addEventListener('mousedown', (e) => {
             state.isPointerDown = true;
-            this.handleInteraction(e);
+            state.isCharging = true;
+            state.chargeStartTime = Date.now();
+            state.chargeX = e.clientX;
+            state.chargeY = e.clientY;
         });
-        window.addEventListener('mouseup', () => {
+        window.addEventListener('mouseup', (e) => {
             state.isPointerDown = false;
+            if (state.isCharging) {
+                const duration = Date.now() - state.chargeStartTime;
+                if (duration > 500) {
+                    // Initialize if not already (do this FIRST)
+                    if (!state.isInitialized) {
+                        this.handleInteraction({clientX: state.chargeX, clientY: state.chargeY});
+                    }
+                    // Super Ripple
+                    state.ripples.push(new Ripple(state.chargeX, state.chargeY, 'super'));
+                    this.playChord([130.81, 196.00, 261.63], 0.5, state.chargeX);
+                } else {
+                    // Normal tap logic
+                    this.handleInteraction({clientX: state.chargeX, clientY: state.chargeY});
+                }
+                state.isCharging = false;
+            }
         });
 
         window.addEventListener('touchstart', (e) => {
@@ -49,11 +68,30 @@ export const App = {
             if(e.target === this.canvas) {
                  e.preventDefault();
                  state.isPointerDown = true;
-                 this.handleInteraction(e);
+                 state.isCharging = true;
+                 state.chargeStartTime = Date.now();
+                 state.chargeX = e.touches[0].clientX;
+                 state.chargeY = e.touches[0].clientY;
             }
         }, { passive: false });
-        window.addEventListener('touchend', () => {
+        window.addEventListener('touchend', (e) => {
             state.isPointerDown = false;
+            if (state.isCharging) {
+                const duration = Date.now() - state.chargeStartTime;
+                if (duration > 500) {
+                    // Initialize if not already
+                    if (!state.isInitialized) {
+                        this.handleInteraction({clientX: state.chargeX, clientY: state.chargeY});
+                    }
+                    // Super Ripple
+                    state.ripples.push(new Ripple(state.chargeX, state.chargeY, 'super'));
+                    this.playChord([130.81, 196.00, 261.63], 0.5, state.chargeX);
+                } else {
+                    // Normal tap logic
+                    this.handleInteraction({clientX: state.chargeX, clientY: state.chargeY});
+                }
+                state.isCharging = false;
+            }
         });
 
         window.addEventListener('mousemove', (e) => {
@@ -440,6 +478,54 @@ export const App = {
             star.draw(this.ctx);
         });
         state.shootingStars = state.shootingStars.filter(s => s.active);
+
+        // Draw Charging Indicator
+        if (state.isCharging) {
+            const chargeDuration = Date.now() - state.chargeStartTime;
+            if (chargeDuration > 100) { // Small delay before showing
+                const chargeRadius = Math.min(100, chargeDuration * 0.1);
+                this.ctx.beginPath();
+                this.ctx.arc(state.chargeX, state.chargeY, chargeRadius, 0, Math.PI * 2);
+                this.ctx.strokeStyle = `rgba(255, 215, 0, ${Math.min(0.5, chargeDuration / 1000)})`; // Golden, fading in
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+
+                if (chargeDuration > 500) {
+                    this.ctx.fillStyle = `rgba(255, 215, 0, 0.2)`;
+                    this.ctx.fill();
+                }
+            }
+        }
+
+        // Draw Energy Threads between close seeds and check for collisions
+        for (let i = 0; i < state.seeds.length; i++) {
+            for (let j = i + 1; j < state.seeds.length; j++) {
+                const seedA = state.seeds[i];
+                const seedB = state.seeds[j];
+                const dist = Math.hypot(seedA.x - seedB.x, seedA.y - seedB.y);
+
+                if (dist < 150) {
+                    const opacity = 1 - (dist / 150);
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(seedA.x, seedA.y);
+                    this.ctx.lineTo(seedB.x, seedB.y);
+                    this.ctx.strokeStyle = `rgba(200, 220, 255, ${opacity * 0.4})`;
+                    this.ctx.lineWidth = 1;
+                    this.ctx.stroke();
+                }
+
+                // Collision Chimes
+                if (dist < seedA.radius + seedB.radius + 5) {
+                    const now = Date.now();
+                    if (!state.lastCollisionTime) state.lastCollisionTime = 0;
+                    if (now - state.lastCollisionTime > 150) {
+                        const freq = 800 + (seedA.energy + seedB.energy) * 100;
+                        this.playSound(freq, 0.1, 'triangle', (seedA.x + seedB.x) / 2);
+                        state.lastCollisionTime = now;
+                    }
+                }
+            }
+        }
 
         state.seeds.forEach(seed => {
             if (state.isPointerDown) {
