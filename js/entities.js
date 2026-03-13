@@ -46,17 +46,25 @@ export class Ripple {
         this.y = y;
         this.isPulse = isPulse;
         this.radius = 0;
-        this.maxRadius = isPulse ? 450 : 250;
-        this.speed = isPulse ? 1.5 : 2.5; // Faster feedback
-        this.opacity = isPulse ? 0.5 : 0.8;
-        this.lineWidth = isPulse ? 2 : 3;
+
+        if (this.isPulse === 'super') {
+            this.maxRadius = 700;
+            this.speed = 4.0;
+            this.opacity = 1.0;
+            this.lineWidth = 5;
+        } else {
+            this.maxRadius = isPulse ? 450 : 250;
+            this.speed = isPulse ? 1.5 : 2.5; // Faster feedback
+            this.opacity = isPulse ? 0.5 : 0.8;
+            this.lineWidth = isPulse ? 2 : 3;
+        }
     }
 
     update() {
         this.radius += this.speed;
         // Nonlinear fade out
         if (this.opacity > 0) {
-            this.opacity -= (this.radius / this.maxRadius) * 0.02;
+            this.opacity -= (this.radius / this.maxRadius) * (this.isPulse === 'super' ? 0.04 : 0.02);
             if(this.opacity < 0) this.opacity = 0;
         }
     }
@@ -68,20 +76,35 @@ export class Ripple {
 
         // Smoother gradient stroke
         const grad = ctx.createRadialGradient(this.x, this.y, Math.max(0, this.radius - 40), this.x, this.y, this.radius);
-        grad.addColorStop(0, `rgba(255, 255, 255, 0)`);
-        grad.addColorStop(0.5, `rgba(255, 255, 255, ${this.opacity * 0.3})`);
-        grad.addColorStop(1, `rgba(255, 255, 255, ${this.opacity})`);
+
+        if (this.isPulse === 'super') {
+            grad.addColorStop(0, `rgba(255, 215, 0, 0)`);
+            grad.addColorStop(0.5, `rgba(255, 215, 0, ${this.opacity * 0.5})`);
+            grad.addColorStop(1, `rgba(255, 255, 255, ${this.opacity})`);
+        } else {
+            grad.addColorStop(0, `rgba(255, 255, 255, 0)`);
+            grad.addColorStop(0.5, `rgba(255, 255, 255, ${this.opacity * 0.3})`);
+            grad.addColorStop(1, `rgba(255, 255, 255, ${this.opacity})`);
+        }
 
         ctx.strokeStyle = grad;
         ctx.lineWidth = this.lineWidth;
 
         // Add a glow effect
-        ctx.shadowColor = "rgba(200, 220, 255, 0.5)";
-        ctx.shadowBlur = 10;
-
-        if (this.isPulse) {
-            ctx.setLineDash([5, 15]);
+        if (this.isPulse === 'super') {
+            ctx.shadowColor = "rgba(255, 215, 0, 0.8)";
+            ctx.shadowBlur = 20;
+        } else {
+            ctx.shadowColor = "rgba(200, 220, 255, 0.5)";
+            ctx.shadowBlur = 10;
         }
+
+        if (this.isPulse === true) {
+            ctx.setLineDash([5, 15]);
+        } else if (this.isPulse === 'super') {
+            // Solid, thick line for super pulse
+        }
+
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.shadowBlur = 0; // Reset
@@ -91,6 +114,19 @@ export class Ripple {
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.radius * 0.75, 0, Math.PI * 2);
             ctx.strokeStyle = `rgba(255, 255, 255, ${this.opacity * 0.3})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        } else if (this.isPulse === 'super' && this.radius > 40) {
+             // Multiple echoes for super
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius * 0.8, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 215, 0, ${this.opacity * 0.4})`;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius * 0.6, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 255, 255, ${this.opacity * 0.2})`;
             ctx.lineWidth = 1;
             ctx.stroke();
         }

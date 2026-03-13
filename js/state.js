@@ -15,6 +15,10 @@ export const state = {
     lastTap: { time: 0, x: 0, y: 0 },
     mouse: { x: 0, y: 0 }, // For parallax effect
     isPointerDown: false,
+    chargeStartTime: 0,
+    isCharging: false,
+    chargeX: 0,
+    chargeY: 0,
 
     // --- Audio ---
     audioContext: null,
