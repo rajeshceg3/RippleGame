@@ -133,6 +133,47 @@ export class Ripple {
     }
 }
 
+export class FloatingText {
+    constructor(text, x, y) {
+        this.text = text;
+        this.x = x;
+        this.y = y;
+        this.opacity = 0;
+        this.life = 1.0;
+        this.vy = -0.5; // Drift upwards slowly
+    }
+
+    update() {
+        this.y += this.vy;
+
+        // Fade in quickly, then fade out slowly
+        if (this.life > 0.8) {
+            this.opacity += 0.05;
+            if (this.opacity > 1) this.opacity = 1;
+        } else {
+            this.opacity -= 0.01;
+            if (this.opacity < 0) this.opacity = 0;
+        }
+
+        this.life -= 0.005;
+    }
+
+    draw(ctx) {
+        if (this.opacity <= 0) return;
+
+        ctx.save();
+        ctx.globalAlpha = this.opacity;
+        ctx.fillStyle = "rgba(255, 215, 0, 0.9)"; // Golden text
+        ctx.font = "bold 24px 'Cinzel', serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.shadowColor = "rgba(255, 215, 0, 0.5)";
+        ctx.shadowBlur = 10;
+        ctx.fillText(this.text, this.x, this.y);
+        ctx.restore();
+    }
+}
+
 export class ConstellationEntity {
     constructor(definition, centerX, centerY, instantReveal = false) {
         this.nodes = definition.nodes.map(n => {
@@ -145,14 +186,14 @@ export class ConstellationEntity {
         this.opacity = instantReveal ? 1 : 0;
     }
 
-    update() {
+    update(mouse) {
         if (this.opacity < 1) {
             this.opacity += 0.01;
         }
         if (this.edgeProgress < 1) {
             this.edgeProgress += 0.005; // Control drawing speed
         }
-        this.nodes.forEach(node => node.update());
+        this.nodes.forEach(node => node.update(mouse));
     }
 
     draw(ctx) {
@@ -479,23 +520,41 @@ export class ConstellationNode {
         this.opacity = 0;
         this.twinkleSpeed = Math.random() * 0.03 + 0.01;
         this.twinkleOffset = Math.random() * Math.PI;
+        this.hoverGlow = 0;
     }
 
-    update() {
+    update(mouse) {
         if (this.opacity < 1) {
             this.opacity += 0.02;
+        }
+
+        // Calculate hover proximity glow
+        if (mouse && mouse.x !== 0 && mouse.y !== 0) {
+            const dx = mouse.x - this.x;
+            const dy = mouse.y - this.y;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist < 100) {
+                // Closer mouse = higher glow, capped at 1
+                this.hoverGlow = Math.min(1, this.hoverGlow + 0.1);
+            } else {
+                this.hoverGlow = Math.max(0, this.hoverGlow - 0.05);
+            }
+        } else {
+            this.hoverGlow = Math.max(0, this.hoverGlow - 0.05);
         }
     }
 
     draw(ctx) {
         const time = Date.now() * 0.001;
         const twinkle = Math.sin(time * 2 + this.twinkleOffset) * 0.3 + 0.7;
-        const currentOpacity = this.opacity * twinkle;
+        const currentOpacity = this.opacity * twinkle + (this.hoverGlow * 0.5); // Add hover glow
 
         // Glow
-        const glow = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius * 6);
-        glow.addColorStop(0, `rgba(255, 255, 255, ${currentOpacity})`);
-        glow.addColorStop(0.4, `rgba(200, 220, 255, ${currentOpacity * 0.5})`);
+        const glowRadius = this.radius * 6 + (this.hoverGlow * 10);
+        const glow = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, glowRadius);
+        glow.addColorStop(0, `rgba(255, 255, 255, ${Math.min(1, currentOpacity)})`);
+        glow.addColorStop(0.4, `rgba(200, 220, 255, ${Math.min(1, currentOpacity * 0.5)})`);
         glow.addColorStop(1, "rgba(200, 220, 255, 0)");
 
         ctx.fillStyle = glow;
@@ -511,9 +570,9 @@ export class ConstellationNode {
 
         // Spikes (Diamond shape)
         if (this.opacity > 0.5) {
-            ctx.fillStyle = `rgba(255, 255, 255, ${currentOpacity * 0.8})`;
-            const spikeLen = this.radius * 4 * twinkle;
-            const w = this.radius * 0.5;
+            ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, currentOpacity * 0.8)})`;
+            const spikeLen = this.radius * 4 * twinkle + (this.hoverGlow * 15);
+            const w = this.radius * 0.5 + (this.hoverGlow * 2);
 
             ctx.beginPath();
             // Vertical
