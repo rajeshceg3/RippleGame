@@ -1,5 +1,5 @@
 import { state, config } from './state.js';
-import { Ripple, LightSeed, Bloom, ConstellationEntity, StardustParticle, ShootingStar } from './entities.js';
+import { Ripple, LightSeed, Bloom, ConstellationEntity, StardustParticle, ShootingStar, FloatingText } from './entities.js';
 import { ConstellationManager } from './constellation.js';
 import { UI } from './ui.js';
 
@@ -435,17 +435,47 @@ export const App = {
         const centerX = window.innerWidth / 2;
         const centerY = window.innerHeight / 2;
 
-        // Calculate and draw dynamic atmospheric resonance glow
+        // Calculate and draw dynamic atmospheric resonance glow (Breathing Nebula)
         state.resonance = ConstellationManager.getResonance(state.noteSequence);
-        const resonanceGlow = state.resonance * 0.5;
-        const progressGlow = (state.unlockedConstellations ? state.unlockedConstellations.length : 0) * 0.1;
-        const totalGlow = Math.min(1, resonanceGlow + progressGlow);
+        const time = Date.now() * 0.0005; // Time factor for slow breathing
 
-        if (totalGlow > 0) {
-            const grad = this.ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(window.innerWidth, window.innerHeight));
-            grad.addColorStop(0, `rgba(30, 10, 50, ${totalGlow * 0.4})`);
+        // Nebula breathes based on time and shifts slightly
+        const breathX = Math.sin(time) * 100;
+        const breathY = Math.cos(time * 0.8) * 100;
+
+        const baseGlowRadius = Math.max(window.innerWidth, window.innerHeight) * (0.8 + Math.sin(time * 0.5) * 0.1);
+
+        // Color shifts based on unlocked constellations
+        const unlockedCount = state.unlockedConstellations ? state.unlockedConstellations.length : 0;
+        const hueShift = 260 + (unlockedCount * 15) + (Math.sin(time * 0.2) * 20); // Deep purple shifting towards pink/blue
+
+        const resonanceIntensity = state.resonance * 0.6;
+        const progressIntensity = unlockedCount * 0.15;
+        // Always have a base nebula present
+        const totalIntensity = Math.min(1, 0.2 + resonanceIntensity + progressIntensity + Math.sin(time) * 0.05);
+
+        if (totalIntensity > 0) {
+            const grad = this.ctx.createRadialGradient(
+                centerX + breathX, centerY + breathY, 0,
+                centerX + breathX * 0.5, centerY + breathY * 0.5, baseGlowRadius
+            );
+
+            // Core nebula
+            grad.addColorStop(0, `hsla(${hueShift}, 80%, 20%, ${totalIntensity * 0.6})`);
+            // Mid nebula shift
+            grad.addColorStop(0.5, `hsla(${hueShift - 30}, 60%, 15%, ${totalIntensity * 0.3})`);
+            // Outer edge fade
             grad.addColorStop(1, `rgba(0, 0, 0, 0)`);
+
             this.ctx.fillStyle = grad;
+            this.ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+
+            // Add a secondary subtle overlay for more texture (dust lane effect)
+            const grad2 = this.ctx.createLinearGradient(0, 0, window.innerWidth, window.innerHeight);
+            grad2.addColorStop(0, `hsla(${hueShift + 40}, 50%, 10%, ${totalIntensity * 0.2})`);
+            grad2.addColorStop(0.5, `rgba(0, 0, 0, 0)`);
+            grad2.addColorStop(1, `hsla(${hueShift - 40}, 50%, 10%, ${totalIntensity * 0.2})`);
+            this.ctx.fillStyle = grad2;
             this.ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
         }
 
@@ -475,6 +505,31 @@ export const App = {
 
         state.shootingStars.forEach(star => {
             star.update();
+
+            // Check collision with ripples
+            if (star.active) {
+                state.ripples.forEach(ripple => {
+                    const dist = Math.hypot(star.x - ripple.x, star.y - ripple.y);
+                    if (Math.abs(dist - ripple.radius) < 20) {
+                        // Shatter the star
+                        star.active = false;
+
+                        // Generate stardust burst
+                        for (let i = 0; i < 15; i++) {
+                            const particle = new StardustParticle(star.x, star.y);
+                            particle.vx += Math.cos(star.angle) * 2;
+                            particle.vy -= Math.sin(star.angle) * 2;
+                            state.stardust.push(particle);
+                        }
+
+                        // Crystalline chime
+                        this.playSound(880, 0.3, 'triangle', star.x);
+                        setTimeout(() => this.playSound(1108.73, 0.2, 'sine', star.x), 100);
+                        setTimeout(() => this.playSound(1318.51, 0.1, 'triangle', star.x), 200);
+                    }
+                });
+            }
+
             star.draw(this.ctx);
         });
         state.shootingStars = state.shootingStars.filter(s => s.active);
@@ -544,7 +599,7 @@ export const App = {
         });
 
         state.constellationEntities.forEach(entity => {
-            entity.update();
+            entity.update(state.mouse);
             entity.draw(this.ctx);
         });
 
@@ -604,6 +659,10 @@ export const App = {
                             if (definition) {
                                 const entity = new ConstellationEntity(definition, newConstellationData.x, newConstellationData.y, false);
                                 state.constellationEntities.push(entity);
+
+                                // Instantiate and push FloatingText entity
+                                const textEntity = new FloatingText(definition.name, newConstellationData.x, newConstellationData.y - 80);
+                                state.floatingTexts.push(textEntity);
                             }
                         }
 
@@ -633,6 +692,15 @@ export const App = {
         state.blooms = state.blooms.filter(b => b.life > 0);
 
         this.ctx.globalCompositeOperation = 'source-over';
+
+        // Render Floating Texts
+        if (state.floatingTexts) {
+            state.floatingTexts.forEach(text => {
+                text.update();
+                text.draw(this.ctx);
+            });
+            state.floatingTexts = state.floatingTexts.filter(t => t.opacity > 0);
+        }
 
         state.animationFrameId = requestAnimationFrame(() => this.animate());
     }

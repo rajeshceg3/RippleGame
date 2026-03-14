@@ -36,6 +36,7 @@ export const state = {
     unlockedConstellations: [], // Stores the data of unlocked constellations (key, center)
     constellationEntities: [], // Stores the actual constellation entities for rendering
     resonance: 0, // Calculates how close the user is to a harmonic sequence
+    floatingTexts: [], // Temporary on-canvas labels
 };
 
 export const config = {
