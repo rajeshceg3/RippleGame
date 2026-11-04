@@ -17,12 +17,15 @@ export const UI = {
             this.openCodex();
         });
 
-        // Touch specific for better responsiveness
-        this.codexButton.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            this.openCodex();
-        }, { passive: false });
-
+        document.addEventListener('keydown', (e) => {
+            if (this.codexOverlay.classList.contains('hidden')) return;
+            if (e.key === 'Escape') { e.preventDefault(); this.closeCodex(); }
+            if (e.key === 'Tab') {
+                const first = this.codexShare, last = this.codexClose;
+                if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+            }
+        });
         this.codexClose.addEventListener('click', () => this.closeCodex());
         this.codexShare.addEventListener('click', () => this.shareGarden());
 
@@ -37,12 +40,18 @@ export const UI = {
     openCodex() {
         this.updateCodexContent();
         this.codexOverlay.classList.remove('hidden');
+        this.codexButton.setAttribute('aria-expanded', 'true');
+        setTimeout(() => {
+            if (!this.codexOverlay.classList.contains('hidden')) this.codexShare.focus();
+        }, 550);
         // Reset scroll position
         if(this.codexContent) this.codexContent.scrollTop = 0;
     },
 
     closeCodex() {
         this.codexOverlay.classList.add('hidden');
+        this.codexButton.setAttribute('aria-expanded', 'false');
+        this.codexButton.focus();
     },
 
     updateCodexContent() {

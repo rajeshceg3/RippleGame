@@ -34,7 +34,8 @@ export const App = {
         // Attach all event listeners
         window.addEventListener('resize', () => this.resizeCanvas());
 
-        window.addEventListener('mousedown', (e) => {
+        this.canvas.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
             state.isPointerDown = true;
             state.isCharging = true;
             state.chargeStartTime = Date.now();
@@ -133,7 +134,8 @@ export const App = {
                 const decodedState = JSON.parse(jsonString);
 
                 if (decodedState && Array.isArray(decodedState.unlockedConstellations)) {
-                    this.applyState(decodedState);
+                    if (!this.applyState(decodedState)) throw new Error("Invalid garden state");
+                    try { localStorage.setItem("auraGardenState", JSON.stringify({ unlockedConstellations: state.unlockedConstellations })); } catch { /* Sharing still works without storage. */ }
                     stateLoaded = true;
                     console.log("Loaded garden state from URL.");
                     // Clear the hash to avoid re-loading on refresh and have a clean URL
@@ -162,11 +164,20 @@ export const App = {
     },
 
     applyState(newState) {
+        // Validate the entire imported payload before touching the current garden.
+        const entries = newState?.unlockedConstellations;
+        if (!Array.isArray(entries) || entries.length > Object.keys(ConstellationManager.definitions).length ||
+            entries.some(c => !c || !Object.hasOwn(ConstellationManager.definitions, c.key) ||
+                !Number.isFinite(c.x) || !Number.isFinite(c.y)) ||
+            new Set(entries.map(c => c.key)).size !== entries.length) return false;
+        const safeEntries = entries.map(c => ({ key: c.key,
+            x: Math.max(0, Math.min(window.innerWidth, c.x)),
+            y: Math.max(0, Math.min(window.innerHeight, c.y)) }));
         // Clear any existing state before applying the new one
         state.unlockedConstellations = [];
         state.constellationEntities = [];
 
-        state.unlockedConstellations = newState.unlockedConstellations;
+        state.unlockedConstellations = safeEntries;
 
         // Re-create the visual entities from the loaded data
         state.unlockedConstellations.forEach(constellationData => {
@@ -176,6 +187,7 @@ export const App = {
                 state.constellationEntities.push(entity);
             }
         });
+        return true;
     },
 
     handleVisibilityChange() {
@@ -391,7 +403,7 @@ export const App = {
         if (!state.isInitialized) {
             state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
             this.initAmbientAudio();
-            this.introMessage.style.opacity = '0';
+            this.introMessage.classList.add('awakened');
             // Pass the logical canvas size to LightSeed
             const logicalCanvas = { width: window.innerWidth, height: window.innerHeight };
             for (let i = 0; i < 5; i++) { state.seeds.push(new LightSeed(logicalCanvas)); }
@@ -400,8 +412,9 @@ export const App = {
 
         const currentTime = Date.now();
         const timeSinceLastTap = currentTime - state.lastTap.time;
-        const x = e.clientX || (e.touches && e.touches[0].clientX);
-        const y = e.clientY || (e.touches && e.touches[0].clientY);
+        const x = e.clientX ?? e.touches?.[0]?.clientX;
+        const y = e.clientY ?? e.touches?.[0]?.clientY;
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return;
         const dist = Math.hypot(x - state.lastTap.x, y - state.lastTap.y);
 
         if (timeSinceLastTap < config.DOUBLE_TAP_DELAY && dist < config.DOUBLE_TAP_RADIUS) {

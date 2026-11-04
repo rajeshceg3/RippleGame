@@ -33,7 +33,9 @@
             animation: gradientShift 180s ease infinite;
         }
 
+        #intro-message.awakened { opacity: 0; animation: none; }
         #intro-message {
+            z-index: 1;
             position: absolute;
             top: 50%;
             left: 50%;
@@ -69,7 +71,7 @@
         /* --- Astral Codex UI --- */
         #codex-button {
             position: absolute; top: 30px; right: 30px;
-            font-size: 2.5rem; cursor: pointer; user-select: none; z-index: 100;
+            font-size: 1rem; cursor: pointer; user-select: none; z-index: 100;
             transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             filter: drop-shadow(0 0 8px rgba(255,215,0,0.2));
             opacity: 0.8;
@@ -169,7 +171,7 @@
 
         /* --- Mobile Optimization --- */
         @media (max-width: 768px) {
-            #codex-button { top: auto; bottom: 30px; right: 30px; font-size: 3rem; }
+            #codex-button { top: auto; bottom: 30px; right: 30px; font-size: 1rem; }
 
             #codex-content {
                 width: 100%; height: 70%; bottom: 0; position: absolute; top: auto;
@@ -186,22 +188,30 @@
 
             #codex-close, #codex-share { padding: 1rem 1.5rem; width: 80%; margin: 0.5rem 0; display: block; box-sizing: border-box; text-align: center; }
         }
+        * { box-sizing: border-box; }
+        button { font-family: inherit; color: inherit; }
+        #codex-button { background: transparent; border: 0; padding: .25rem; }
+        button:focus-visible { outline: 3px solid var(--color-gold); outline-offset: 4px; }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation: none !important; transition: none !important; }
+            #codex-list li { opacity: .9; }
+        }
     </style>
 </head>
 <body>
     <div id="intro-message">Touch to awaken the garden</div>
 
     <!-- Astral Codex UI -->
-    <div id="codex-button">📜</div>
+    <button id="codex-button" type="button" aria-label="Open Astral Codex" aria-controls="codex-content" aria-expanded="false">Codex</button>
     <div id="codex-overlay" class="hidden">
-        <div id="codex-content">
-            <h2>Astral Codex</h2>
+        <div id="codex-content" role="dialog" aria-modal="true" aria-labelledby="codex-title">
+            <h2 id="codex-title">Astral Codex</h2>
             <ul id="codex-list">
                 <!-- Discovered constellations will be listed here by ui.js -->
             </ul>
             <div>
-                <div id="codex-share" title="Copy a shareable link to your clipboard">Share Garden</div>
-                <div id="codex-close">Close</div>
+                <button type="button" id="codex-share" title="Copy a shareable link to your clipboard">Share Garden</button>
+                <button type="button" id="codex-close">Close</button>
             </div>
         </div>
     </div>
