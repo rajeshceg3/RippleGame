@@ -1,0 +1,63 @@
+{
+  "scope": "Local real mouse input; cancellation/visibility events simulated, not OS background or physical touch",
+  "results": [
+    {
+      "width": 390,
+      "event": "blur",
+      "cancelled": true,
+      "noReleaseEffect": true
+    },
+    {
+      "width": 390,
+      "event": "touchcancel",
+      "cancelled": true,
+      "noReleaseEffect": true
+    },
+    {
+      "width": 390,
+      "event": "pointercancel",
+      "cancelled": true,
+      "noReleaseEffect": true
+    },
+    {
+      "width": 390,
+      "event": "visibilitychange",
+      "cancelled": true,
+      "noReleaseEffect": true
+    },
+    {
+      "width": 390,
+      "ordinaryTap": true,
+      "pageErrors": []
+    },
+    {
+      "width": 1365,
+      "event": "blur",
+      "cancelled": true,
+      "noReleaseEffect": true
+    },
+    {
+      "width": 1365,
+      "event": "touchcancel",
+      "cancelled": true,
+      "noReleaseEffect": true
+    },
+    {
+      "width": 1365,
+      "event": "pointercancel",
+      "cancelled": true,
+      "noReleaseEffect": true
+    },
+    {
+      "width": 1365,
+      "event": "visibilitychange",
+      "cancelled": true,
+      "noReleaseEffect": true
+    },
+    {
+      "width": 1365,
+      "ordinaryTap": true,
+      "pageErrors": []
+    }
+  ]
+}
