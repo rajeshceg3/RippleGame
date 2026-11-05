@@ -119,6 +119,9 @@ export const App = {
         }, { passive: true });
 
         document.addEventListener('visibilitychange', () => this.handleVisibilityChange());
+        window.addEventListener('blur', () => this.cancelCharge());
+        window.addEventListener('touchcancel', () => this.cancelCharge());
+        window.addEventListener('pointercancel', () => this.cancelCharge());
 
         this.animate();
     },
@@ -190,8 +193,16 @@ export const App = {
         return true;
     },
 
+    // Cancellation discards a gesture. It must never run the release action.
+    cancelCharge() {
+        state.isPointerDown = false;
+        state.isCharging = false;
+        state.chargeStartTime = 0;
+    },
+
     handleVisibilityChange() {
         if (document.visibilityState === 'hidden') {
+            this.cancelCharge();
             state.isPaused = true;
             cancelAnimationFrame(state.animationFrameId);
         } else {
